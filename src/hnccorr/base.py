@@ -143,6 +143,7 @@ class HNCcorr:
         self.patch_size = patch_size
 
         self.movie = None
+        self.prior = None
         self.segmentations = []
         self.candidates = []
 
@@ -201,7 +202,7 @@ class HNCcorr:
             config.patch_size,
         )
 
-    def segment(self, movie):
+    def segment(self, movie, prior=None):
         """Applies the HNCcorr algorithm to identify cells in a calcium-imaging movie.
 
         Identifies cells the spatial footprints of cells in a calcium imaging movie.
@@ -217,6 +218,7 @@ class HNCcorr:
             Reference to itself.
         """
         self.movie = movie
+        self.prior = prior
         self.seeder.reset()
         self.segmentations = []
         self.candidates = []
@@ -289,6 +291,10 @@ class HNCcorrConfig:
         patch_size (int): Size in pixel of each dimension of the patch.
         _entries (dict): Dict with parameter keys and values. Each parameter value
             (when defined) is also accessible as an attribute.
+        initialize_with_prior_segmentation (bool): Flag indicating whether a prior
+            a Prior segmentation object will be given
+        prior_gaussian_distance_alpha (float): Decay factor in gaussian function
+            applied to prior signed distance transform
     """
 
     def __init__(self, **entries):
@@ -309,6 +315,8 @@ class HNCcorrConfig:
             "sparse_computation_grid_distance",
             "sparse_computation_dimension",
             "patch_size",
+            "initialize_with_prior_segmentation",
+            "prior_gaussian_distance_alpha",
         }
 
         for param in entries:
@@ -359,4 +367,6 @@ DEFAULT_CONFIG = HNCcorrConfig(
     sparse_computation_grid_distance=1 / 35.0,
     sparse_computation_dimension=3,
     patch_size=31,
+    initialize_with_prior_segmentation=False,
+    prior_gaussian_distance_alpha=1.0,
 )
