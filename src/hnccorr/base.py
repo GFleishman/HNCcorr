@@ -169,17 +169,21 @@ class HNCcorr:
         else:
             config = DEFAULT_CONFIG + config
 
+        if config.initialize_with_prior_segmentation:
+            seeder = PriorSegmentationSeeder(config.seeder_exclusion_padding)
+        else:
+            seeder = LocalCorrelationSeeder(
+                         config.seeder_mask_size,
+                         config.percentage_of_seeds,
+                         config.seeder_exclusion_padding,
+                         config.seeder_grid_size)
+
         edge_selector = SparseComputationEmbeddingWrapper(
             config.sparse_computation_dimension, config.sparse_computation_grid_distance
         )
 
         return cls(
-            LocalCorrelationSeeder(
-                config.seeder_mask_size,
-                config.percentage_of_seeds,
-                config.seeder_exclusion_padding,
-                config.seeder_grid_size,
-            ),
+            seeder,
             SizePostprocessor(
                 config.postprocessor_min_cell_size,
                 config.postprocessor_max_cell_size,
