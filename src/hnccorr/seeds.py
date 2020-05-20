@@ -26,6 +26,7 @@
 from math import sin, cos, pi
 import itertools
 import numpy as np
+from scipy.ndimage import center_of_mass
 
 from hnccorr.utils import (
     add_offset_set_coordinates,
@@ -182,6 +183,117 @@ class LocalCorrelationSeeder:
 
         return best_pixels
 
+    def exclude_pixels(self, pixels):
+        """Excludes pixels from being returned by `next()` method.
+
+        All pixels within in the set `pixels` as well as pixels that are within an L-
+        infinity distance of `_padding` from any excluded pixel are excluded as seeds.
+
+        Method enables exclusion of pixels in previously segmented cells from serving
+        as new seeds. This may help to prevent repeated segmentation of the cell.
+
+        Args:
+            pixels (set): Set of pixel coordinates to exclude.
+
+        Returns:
+            None
+        """
+        neighborhood = eight_neighborhood(self._movie.num_dimensions, self._padding)
+
+        padded_pixel_sets = [
+            add_offset_set_coordinates(neighborhood, pixel) for pixel in pixels
+        ]
+
+        self._excluded_pixels = self._excluded_pixels.union(
+            pixels.union(*padded_pixel_sets)
+        )
+
+    def next(self):
+        """Provides next seed pixel for segmentation.
+
+        Returns the movie coordinates of the next available seed pixel for
+        segmentation. Seed pixels that have previously been excluded will be ignored.
+        Returns None when all seeds are exhausted.
+
+        Returns:
+            tuple or None: Coordinates of next seed pixel. None if no seeds remaining.
+        """
+        while self._current_index < len(self._seeds):
+            center_seed = self._seeds[self._current_index]
+            self._current_index += 1
+
+            if center_seed not in self._excluded_pixels:
+                return center_seed
+
+        return None
+
+    def reset(self):
+        """Reinitialize the sequence of seed pixels and empties `_excluded_seeds`."""
+        self._current_index = 0
+        self._excluded_pixels = set()
+
+
+class PriorSegmentationSeeder:
+    """Provide seeds based on the centroids of segments in a Prior object
+
+    The centroids of all segments provided in the Prior object are considered.
+    The seeds are sorted by average correlation of all pixels within the prior segment.
+
+    Attributes:
+        _current_index (int): Index of next seed in `_seeds` to return.
+        _excluded_pixels (set): Set of pixel coordinates to excluded as future seeds.
+        _movie (Movie): Movie to segment.
+        _prior (Prior): Prior segmentation for _movie
+        _padding (int): L-infinity distance for determining which pixels should be
+            padded to the exclusion set in `exclude_pixels()`.
+        _seeds (list[tuple]): List of candidate seed coordinates to return.
+    """
+
+    def __init__(self, padding):
+        """Initializes a LocalCorrelationSeeder object."""
+        self._current_index = None
+        self._excluded_pixels = set()
+        self._movie = None
+        self._prior = None
+        self._padding = padding
+        self._seeds = None
+
+    def select_seeds(self, movie, prior):
+        """Identifies candidate seeds in movie.
+
+        Initializes list of candidate seeds in the movie. See class description for
+        details. Seeds can be accessed via the :meth:`~.PriorSegmentationSeeder.next`
+        method.
+
+        Args:
+            movie (Movie): Movie object to segment.
+            prior (Prior): Prior object corresponding to movie
+
+        Returns:
+            None
+        """
+        self._movie = movie
+        self._prior = prior
+        coms, labels = self._get_centers_of_mass(prior)
+        corr = [self._get_prior_label_correlation(movie, prior, l) for l in labels]
+        coms = np.array(coms)[np.argsort(np.array(corr))[::-1]].T
+        self._seeds = list(zip(coms[0], coms[1]))
+        self.reset()
+
+    def _get_centers_of_mass(self, prior):
+        """Get center of mass for each unique label in the prior
+           returns list of tuples [(c1, c2), (c1, c2)...] where c1/c2 are the
+           coordinates of the center of mass for that label"""
+        labels = np.unique(prior[...]).astype(np.uint32)[1:]  # 0 is background
+        coms = center_of_mass(prior[...] > 0, prior[...], labels)
+        coms = np.around(coms).astype(np.uint32).T
+        return list(zip(coms[0], coms[1])), labels
+
+    def _get_prior_label_correlation(self, movie, prior, label):
+        """Compute average correlation of all pixel time series within a label"""
+        time_series = movie[:, prior[...] == label].T
+        return np.mean(np.corrcoef(time_series))
+        
     def exclude_pixels(self, pixels):
         """Excludes pixels from being returned by `next()` method.
 
