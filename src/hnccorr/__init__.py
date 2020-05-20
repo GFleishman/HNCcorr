@@ -26,3 +26,4 @@
 
 from hnccorr.base import HNCcorr, HNCcorrConfig
 from hnccorr.movie import Movie
+from hnccorr.prior import Prior
