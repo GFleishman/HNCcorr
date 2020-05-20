@@ -119,6 +119,7 @@ class HNCcorr:
     def __init__(
         # pylint: disable=C0330
         self,
+        config,
         seeder,
         postprocessor,
         segmentor,
@@ -131,6 +132,7 @@ class HNCcorr:
         patch_size,
     ):
         """Initalizes HNCcorr object."""
+        self.config = config
         self.seeder = seeder
         self.postprocessor = postprocessor
         self.segmentor = segmentor
@@ -183,6 +185,7 @@ class HNCcorr:
         )
 
         return cls(
+            config,
             seeder,
             SizePostprocessor(
                 config.postprocessor_min_cell_size,
@@ -227,7 +230,10 @@ class HNCcorr:
         self.segmentations = []
         self.candidates = []
 
-        self.seeder.select_seeds(movie)
+        if self.config.initialize_with_prior_segmentation:
+            self.seeder.select_seeds(movie, prior)
+        else:
+            self.seeder.select_seeds(movie)
 
         seed = self.seeder.next()
         while seed is not None:
