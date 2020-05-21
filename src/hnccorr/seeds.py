@@ -270,15 +270,18 @@ class PriorSegmentationSeeder:
             prior (Prior): Prior object corresponding to movie
 
         Returns:
-            None
+            seeds (coms) and labels
         """
         self._movie = movie
         self._prior = prior
         coms, labels = self._get_centers_of_mass(prior)
         corr = [self._get_prior_label_correlation(movie, prior, l) for l in labels]
-        coms = np.array(coms)[np.argsort(np.array(corr))[::-1]].T
+        sort_idx = np.argsort(np.array(corr))[::-1]
+        labels = labels[sort_idx]
+        coms = np.array(coms)[sort_idx].T
         self._seeds = list(zip(coms[0], coms[1]))
         self.reset()
+        return seeds, labels
 
     def _get_centers_of_mass(self, prior):
         """Get center of mass for each unique label in the prior

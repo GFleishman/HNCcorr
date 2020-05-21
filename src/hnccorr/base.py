@@ -22,7 +22,7 @@
 # IS". REGENTS HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
 # ENHANCEMENTS, OR MODIFICATIONS.
 """Base components of HNCcorr."""
-
+import sys  # DEBUG
 
 from copy import deepcopy
 
@@ -95,15 +95,15 @@ class Candidate:
             movie, self.center_seed, self._hnccorr.patch_size
         )
         if prior is not None:
+            label = prior.get_seed_label(self.center_seed)
             prior_patch = self._hnccorr.prior_patch_class(
-                prior, self.center_seed, self._hnccorr.patch_size
+                prior, label, self.center_seed, self._hnccorr.patch_size
             )
-        # TODO: use prior patch to initialize graph weights with gaussian of dist transform
         embedding = self._hnccorr.embedding_class(patch)
         graph = self._hnccorr.graph_constructor.construct(patch, embedding)
         if prior is not None:
             graph = self._hnccorr.graph_constructor.add_prior_node_weights(
-                graph, prior, lambda x: exponential_distance_decay(x, 0,
+                graph, prior_patch, lambda x: exponential_distance_decay(x, 0,
                 -self._hnccorr.config.prior_gaussian_distance_alpha)
             )
         self.segmentations = self._hnccorr.segmentor.solve(graph, pos_seeds, neg_seeds)
@@ -156,7 +156,7 @@ class HNCcorr:
         self.graph_constructor = graph_constructor
         self._candidate_class = candidate_class
         self.patch_class = patch_class
-        self.prior_patch_class = prior_patch_class,
+        self.prior_patch_class = prior_patch_class
         self.embedding_class = embedding_class
         self.patch_size = patch_size
 
@@ -250,7 +250,8 @@ class HNCcorr:
         self.candidates = []
 
         if self.config.initialize_with_prior_segmentation:
-            self.seeder.select_seeds(movie, prior)
+            seeds, labels = self.seeder.select_seeds(movie, prior)
+            prior.store_seed_labels(seeds, labels)
         else:
             self.seeder.select_seeds(movie)
 
@@ -262,6 +263,7 @@ class HNCcorr:
                 "Cells identified: %d, Next candidate: %d"
                 % (len(self.segmentations), len(self.candidates))
             )
+            sys.stdout.flush()  # DEBUG
             best_segmentation = candidate.segment()
             if best_segmentation is not None:
                 self.segmentations.append(best_segmentation)

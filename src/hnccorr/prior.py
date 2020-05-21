@@ -47,12 +47,15 @@ class Prior:
             N1 and N2 are the number of pixels in the first and second
             dimension respectively.
         _data_size (tuple): Size of array _data.
+        _seed_labels (dict): labels associated with each seed
+            set with store_seed_labels() function
     """
 
     def __init__(self, name, data):
         self.name = name
         self._data = data
         self.data_size = data.shape
+        self._seed_labels = None
 
     @classmethod
     def from_tiff_image(cls, name, image_path):
@@ -116,6 +119,19 @@ class Prior:
     def extract_valid_pixels(self, pixels):
         """Returns subset of pixels that are valid coordinates for the prior."""
         return {pixel for pixel in pixels if self.is_valid_pixel_coordinate(pixel)}
+
+    def store_seed_labels(self, seeds, labels):
+        """Store the mapping of seed coordinates to prior labels"""
+        self._seed_labels = {}
+        for seed, label in zip(seeds, labels):
+            self._seed_labels[seed] = label
+
+    def get_seed_label(self, seed):
+        """Return the label for a seed"""
+        if self._seed_labels is not None:
+            return self._seed_labels[seed]
+        else:
+            raise RuntimeError("Prior.get_seed_label called before Prior.store_seed_labels")
 
 
 class Prior_Patch:
