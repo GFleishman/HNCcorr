@@ -144,7 +144,8 @@ class GraphConstructor:
         """
         dist_transform = prior.get_distance_transform()
         for node in prior.enumerate_pixels():
-            graph.nodes[node]['prior_weight'] = prior_weight_function(prior[node])
+            node_local = prior.to_patch_coordinate(node)
+            graph.nodes[node]['prior_weight'] = prior_weight_function(prior[node_local])
         return graph
 
 

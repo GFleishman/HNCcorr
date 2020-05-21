@@ -281,7 +281,7 @@ class PriorSegmentationSeeder:
         coms = np.array(coms)[sort_idx].T
         self._seeds = list(zip(coms[0], coms[1]))
         self.reset()
-        return seeds, labels
+        return self._seeds, labels
 
     def _get_centers_of_mass(self, prior):
         """Get center of mass for each unique label in the prior
