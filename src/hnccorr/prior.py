@@ -25,6 +25,7 @@
 
 import numpy as np
 from PIL import Image
+from scipy.ndimage import distance_transform_edt, binary_dilation, binary_erosion
 
 from hnccorr.utils import (
     add_offset_to_coordinate,
@@ -137,6 +138,7 @@ class Prior_Patch:
         _coordinate_offset (tuple): Prior coordinates of the pixel that represents the
             zero coordinate in the Patch object. Similar to the Prior, pixels in the
             Patch are indexed from the top left corner.
+        _label (int): the prior segment label corresponding to the patch
         _data (np.array): Subset of the Prior data. Only data for the patch is stored.
         _prior (Prior): Prior for which the Patch object is a subregion.
         _num_dimensions (int): Dimension of the patch. It matches the dimension of the
@@ -144,7 +146,7 @@ class Prior_Patch:
         _patch_size (int): length of the patch in each dimension. Must be an odd number.
     """
 
-    def __init__(self, prior, center_seed, patch_size):
+    def __init__(self, prior, label, center_seed, patch_size):
         """Initializes Patch object."""
         if patch_size % 2 == 0:
             raise ValueError("patch_size (%d) should be an odd number.")
@@ -153,8 +155,14 @@ class Prior_Patch:
         self._center_seed = center_seed
         self._patch_size = patch_size
         self._prior = prior
+        self._label = label
         self._coordinate_offset = self._compute_coordinate_offset()
         self._data = self._prior[self._prior_indices()]
+
+    @property
+    def label(self):
+        """the prior segmentation label corresponding to the patch"""
+        return self._label
 
     @property
     def pixel_shape(self):
@@ -243,4 +251,11 @@ class Prior_Patch:
         """Access data for pixels in the patch. Indexed in patch coordinates."""
         return self._data[key]
 
+    def get_distance_transform(self):
+        """Returns the signed distance transform of all pixels to the prior label boundary"""
+        foreground = self._data == self._label
+        boundary = binary_dilation(foreground) ^ binary_erosion(foreground)
+        dist_trans = distance_transform_edt(~boundary)
+        dist_trans[~foreground] *= -1
+        return dist_trans
 
