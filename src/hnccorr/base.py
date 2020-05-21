@@ -24,6 +24,7 @@
 """Base components of HNCcorr."""
 import sys  # DEBUG
 
+import numpy as np
 from copy import deepcopy
 
 from hnccorr.movie import Patch
@@ -102,9 +103,9 @@ class Candidate:
         embedding = self._hnccorr.embedding_class(patch)
         graph = self._hnccorr.graph_constructor.construct(patch, embedding)
         if prior is not None:
+            prior_alpha = self._hnccorr.config.prior_gaussian_distance_alpha
             graph = self._hnccorr.graph_constructor.add_prior_node_weights(
-                graph, prior_patch, lambda x: exponential_distance_decay(x, 0,
-                -self._hnccorr.config.prior_gaussian_distance_alpha)
+                graph, prior_patch, lambda x: np.exp(x * prior_alpha)
             )
         self.segmentations = self._hnccorr.segmentor.solve(graph, pos_seeds, neg_seeds)
         self.clean_segmentations = [
