@@ -132,6 +132,21 @@ class GraphConstructor:
 
         return graph
 
+    def add_prior_node_weights(self, graph, prior, prior_weight_function):
+        """Adds weights to the nodes of the graph
+
+           Args:
+               graph (nx.Graph): the graph to which node weights will be added
+               prior (Prior_Patch): the Prior_Patch determining the prior node weights
+               prior_weight_function (function): function applied to the prior weights
+                   must be from R to R+U{0}, i.e. take any real number and return any
+                   non-negative real number
+        """
+        dist_transform = prior.get_distance_transform()
+        for node in prior.enumerate_pixels():
+            graph.nodes[node]['prior_weight'] = prior_weight_function(prior[node])
+        return graph
+
 
 class SparseComputationEmbeddingWrapper:
     """Wrapper for SparseComputation that accepts an embedding.

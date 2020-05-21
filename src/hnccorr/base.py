@@ -27,6 +27,7 @@
 from copy import deepcopy
 
 from hnccorr.movie import Patch
+from hnccorr.prior import Prior_Patch
 from hnccorr.graph import (
     CorrelationEmbedding,
     exponential_distance_decay,
@@ -37,6 +38,7 @@ from hnccorr.seeds import (
     PositiveSeedSelector,
     NegativeSeedSelector,
     LocalCorrelationSeeder,
+    PriorSegmentationSeeder,
 )
 from hnccorr.segmentation import HncParametricWrapper
 from hnccorr.postprocessor import SizePostprocessor
@@ -85,13 +87,25 @@ class Candidate:
             Segmentation or None: Best segmentation or None if no cell is found.
         """
         movie = self._hnccorr.movie
+        prior = self._hnccorr.prior
+        # TODO: consider positive seed selector for prior: use maximum of dist transform
         pos_seeds = self._hnccorr.positive_seed_selector.select(self.center_seed, movie)
         neg_seeds = self._hnccorr.negative_seed_selector.select(self.center_seed, movie)
         patch = self._hnccorr.patch_class(
             movie, self.center_seed, self._hnccorr.patch_size
         )
+        if prior is not None:
+            prior_patch = self._hnccorr.prior_patch_class(
+                prior, self.center_seed, self._hnccorr.patch_size
+            )
+        # TODO: use prior patch to initialize graph weights with gaussian of dist transform
         embedding = self._hnccorr.embedding_class(patch)
         graph = self._hnccorr.graph_constructor.construct(patch, embedding)
+        if prior is not None:
+            graph = self._hnccorr.graph_constructor.add_prior_node_weights(
+                graph, prior, lambda x: exponential_distance_decay(x, 0,
+                -self._hnccorr.config.prior_gaussian_distance_alpha)
+            )
         self.segmentations = self._hnccorr.segmentor.solve(graph, pos_seeds, neg_seeds)
         self.clean_segmentations = [
             s.clean(pos_seeds, movie.pixel_shape) for s in self.segmentations
@@ -128,6 +142,7 @@ class HNCcorr:
         graph_constructor,
         candidate_class,
         patch_class,
+        prior_patch_class,
         embedding_class,
         patch_size,
     ):
@@ -141,6 +156,7 @@ class HNCcorr:
         self.graph_constructor = graph_constructor
         self._candidate_class = candidate_class
         self.patch_class = patch_class
+        self.prior_patch_class = prior_patch_class,
         self.embedding_class = embedding_class
         self.patch_size = patch_size
 
@@ -173,12 +189,14 @@ class HNCcorr:
 
         if config.initialize_with_prior_segmentation:
             seeder = PriorSegmentationSeeder(config.seeder_exclusion_padding)
+            prior_patch_class = Prior_Patch
         else:
             seeder = LocalCorrelationSeeder(
                          config.seeder_mask_size,
                          config.percentage_of_seeds,
                          config.seeder_exclusion_padding,
                          config.seeder_grid_size)
+            prior_patch_class = None
 
         edge_selector = SparseComputationEmbeddingWrapper(
             config.sparse_computation_dimension, config.sparse_computation_grid_distance
@@ -205,6 +223,7 @@ class HNCcorr:
             ),
             Candidate,
             Patch,
+            prior_patch_class,
             CorrelationEmbedding,
             config.patch_size,
         )
